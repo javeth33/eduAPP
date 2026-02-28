@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Brain, FileText, HelpCircle, Download } from 'lucide-react';
 import { ProcessingMode, AdaptedContent } from '@/types';
 import { downloadContent } from '@/utils/downloadUtils';
+import { Typewriter } from './Typewriter'; // Asegúrate de haber creado este archivo
 
 interface ContentDisplayProps {
   mode: ProcessingMode;
@@ -10,6 +11,16 @@ interface ContentDisplayProps {
 }
 
 export function ContentDisplay({ mode, content }: ContentDisplayProps) {
+  // 1. Pantalla de carga (Spinner) mientras Gemini procesa
+  if (content.isProcessing) {
+    return (
+      <div className="bg-white rounded-3xl p-6 md:p-10 shadow-sm border border-dark/5 min-h-[400px] flex flex-col items-center justify-center">
+        <div className="w-12 h-12 border-4 border-sky/20 border-t-sky rounded-full animate-spin mb-4"></div>
+        <p className="text-dark/60 font-medium animate-pulse">Gemini está adaptando tu material...</p>
+      </div>
+    );
+  }
+
   const hasContent = (
     (mode === 'ADHD' && content.adhd) ||
     (mode === 'DYSLEXIA' && content.dyslexiaText) ||
@@ -47,9 +58,11 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
               <div className="bg-cream p-6 rounded-2xl border-l-4 border-sky">
                 <h4 className="font-bold text-lg mb-2">Puntos Clave</h4>
                 <ul className="list-disc list-inside space-y-2 text-dark/80">
-                  {content.adhd?.keyPoints.map((point, i) => (
-                    <li key={i}>{point}</li>
-                  )) || (
+                  {content.adhd?.keyPoints ? (
+                    content.adhd.keyPoints.map((point, i) => (
+                      <li key={i}>{point}</li>
+                    ))
+                  ) : (
                     <>
                       <li>Concepto principal simplificado.</li>
                       <li>Relación con ejemplos cotidianos.</li>
@@ -59,13 +72,19 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
                 </ul>
               </div>
               <div className="bg-sky/10 p-6 rounded-2xl flex items-center justify-center min-h-[150px]">
-                <span className="text-dark/50 italic">
+                <span className="text-dark/50 italic text-center px-4">
                   {content.adhd?.visualCues?.[0] || "Gráfico o diagrama generado..."}
                 </span>
               </div>
             </div>
+            
+            {/* Efecto Typewriter en la respuesta de TDAH */}
             <p className="text-lg leading-relaxed text-dark/80">
-              {content.adhd?.simplifiedText || "Aquí aparecerá el contenido estructurado en bloques pequeños y fáciles de digerir, eliminando el ruido visual innecesario."}
+              {content.adhd?.simplifiedText ? (
+                <Typewriter text={content.adhd.simplifiedText} />
+              ) : (
+                "Aquí aparecerá el contenido estructurado en bloques pequeños..."
+              )}
             </p>
           </motion.div>
         )}
@@ -84,10 +103,13 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
               Lectura Adaptada
             </h3>
             <div className="prose prose-lg max-w-none">
+              {/* Efecto Typewriter en la respuesta de Dislexia */}
               <p className="font-dyslexic text-xl leading-loose tracking-wide text-dark whitespace-pre-line">
-                {content.dyslexiaText || `Este es un ejemplo de cómo se vería el texto adaptado. La fuente OpenDyslexic, junto con un espaciado mayor entre líneas y letras, facilita la lectura y reduce la confusión visual.
-                
-                El fondo crema suave reduce el deslumbramiento y el contraste agresivo del blanco puro sobre negro.`}
+                {content.dyslexiaText ? (
+                  <Typewriter text={content.dyslexiaText} speed={25} />
+                ) : (
+                  "El texto adaptado con fuente OpenDyslexic aparecerá aquí..."
+                )}
               </p>
             </div>
           </motion.div>
@@ -120,11 +142,7 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
                 </div>
               )) || (
                 <div className="p-6 rounded-2xl border-2 border-dark/5 hover:border-sky/50 cursor-pointer transition-colors bg-cream">
-                  <p className="font-semibold text-lg mb-4">1. ¿Cuál es la idea principal del texto?</p>
-                  <div className="space-y-2">
-                    <div className="p-3 rounded-xl bg-white border border-dark/5 hover:bg-sky/10">Opción A: Resumen histórico</div>
-                    <div className="p-3 rounded-xl bg-white border border-dark/5 hover:bg-sky/10">Opción B: Análisis científico</div>
-                  </div>
+                  <p className="font-semibold text-lg mb-4">Cargando preguntas de repaso...</p>
                 </div>
               )}
             </div>

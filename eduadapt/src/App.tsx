@@ -19,47 +19,41 @@ export default function App() {
   });
 
   const handleFileSelect = async (file: File) => {
-    // 1. Iniciamos estado de carga
-    setContent(prev => ({ 
-      ...prev, 
-      isProcessing: true, 
-      originalText: "Procesando material...", 
-      error: null 
-    }));
+  // 1. Activar carga y limpiar contenido previo para que no se vea lo viejo
+  setContent(prev => ({ 
+    ...prev, 
+    isProcessing: true, 
+    adhd: null, 
+    dyslexiaText: null, 
+    quiz: null,
+    error: null 
+  }));
 
-    try {
-      // 2. Llamada única al nuevo endpoint del backend
-      const result = await aiService.adaptarMaterial(file, 'tdah');
-      console.log("¡Datos recibidos!", result);
-
-      // 3. MAPEADO DE DATOS: Conectamos el JSON de Python con tu React
-      setContent({
-        originalText: result.resumen,
-        adhd: {
-          keyPoints: result.bloques,
-          simplifiedText: result.resumen,
-          visualCues: result.glosario.map((g: any) => `${g.termino}: ${g.definicion}`)
-        },
-        dyslexiaText: result.resumen_oral || result.resumen,
-        quiz: result.quiz.map((q: any, index: number) => ({
-          id: String(index),
-          question: q.pregunta,
-          options: q.opciones,
-          correctAnswerIndex: q.respuesta
-        })),
-        isProcessing: false,
-        error: null
-      });
-      
-    } catch (error) {
-      console.error("Error:", error);
-      setContent(prev => ({ 
-        ...prev, 
-        isProcessing: false, 
-        error: "Error al conectar. ¿Está encendido el servidor y tienes el bucket 'uploads' en Supabase?" 
-      }));
-    }
-  };
+  try {
+    const result = await aiService.adaptarMaterial(file, 'tdah');
+    
+    // 2. Al recibir el resultado, quitamos la carga y pasamos los datos
+    setContent({
+      originalText: result.resumen,
+      adhd: {
+        keyPoints: result.bloques,
+        simplifiedText: result.resumen,
+        visualCues: result.glosario.map((g: any) => `${g.termino}: ${g.definicion}`)
+      },
+      dyslexiaText: result.resumen_oral || result.resumen,
+      quiz: result.quiz.map((q: any, index: number) => ({
+        id: String(index),
+        question: q.pregunta,
+        options: q.opciones,
+        correctAnswerIndex: q.respuesta
+      })),
+      isProcessing: false, // ¡IMPORTANTE! Aquí se quita el spinner
+      error: null
+    });
+  } catch (error) {
+    setContent(prev => ({ ...prev, isProcessing: false, error: "Error de conexión" }));
+  }
+};
   return (
     <div className="min-h-screen flex flex-col bg-cream text-dark font-sans selection:bg-sky/30">
       <Header />
