@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Brain, FileText, HelpCircle, Download, CheckCircle2, XCircle } from 'lucide-react';
+import { Brain, FileText, HelpCircle, Download, CheckCircle2, XCircle, Volume2, Square } from 'lucide-react';
 import { ProcessingMode, AdaptedContent } from '@/types';
 import { downloadContent } from '@/utils/downloadUtils';
 import { Typewriter } from './Typewriter';
@@ -11,15 +11,39 @@ interface ContentDisplayProps {
 }
 
 export function ContentDisplay({ mode, content }: ContentDisplayProps) {
-  // Estado para rastrear las respuestas seleccionadas por pregunta
   const [selectedOptions, setSelectedOptions] = useState<Record<string, number>>({});
+  
+  // --- Estados para el Audio (TTS) ---
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const synthRef = useRef<SpeechSynthesis | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  const handleOptionClick = (questionId: string, optionIndex: number) => {
-    setSelectedOptions(prev => ({
-      ...prev,
-      [questionId]: optionIndex
-    }));
+  useEffect(() => {
+    synthRef.current = window.speechSynthesis;
+    // Limpiar audio si se desmonta el componente
+    return () => synthRef.current?.cancel();
+  }, []);
+
+  const toggleSpeech = (text: string) => {
+    if (!synthRef.current) return;
+
+    if (isSpeaking) {
+      synthRef.current.cancel();
+      setIsSpeaking(false);
+    } else {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'es-MX'; // Configurado para español
+      utterance.rate = 0.9;     // Un poco más lento para mejor comprensión
+      
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      
+      utteranceRef.current = utterance;
+      synthRef.current.speak(utterance);
+      setIsSpeaking(true);
+    }
   };
+  // -----------------------------------
 
   if (content.isProcessing) {
     return (
@@ -29,6 +53,10 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
       </div>
     );
   }
+
+  const handleOptionClick = (questionId: string, optionIndex: number) => {
+    setSelectedOptions(prev => ({ ...prev, [questionId]: optionIndex }));
+  };
 
   const hasContent = (
     (mode === 'ADHD' && content.adhd) ||
@@ -43,7 +71,6 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
           onClick={() => downloadContent(mode, content)}
           className="absolute top-6 right-6 md:top-10 md:right-10 p-2 rounded-full hover:bg-dark/5 text-dark/60 hover:text-dark transition-colors"
           title="Descargar contenido"
-          aria-label="Descargar contenido"
         >
           <Download size={24} />
         </button>
@@ -51,14 +78,7 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
 
       <AnimatePresence mode="wait">
         {mode === 'ADHD' && (
-          <motion.div 
-            key="adhd"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="space-y-6"
-          >
+          <motion.div key="adhd" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
             <h3 className="text-2xl font-bold text-dark mb-4 flex items-center gap-2 pr-12">
               <Brain className="text-sky" />
               Resumen Visual
@@ -67,69 +87,51 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
               <div className="bg-cream p-6 rounded-2xl border-l-4 border-sky">
                 <h4 className="font-bold text-lg mb-2">Puntos Clave</h4>
                 <ul className="list-disc list-inside space-y-2 text-dark/80">
-                  {content.adhd?.keyPoints ? (
-                    content.adhd.keyPoints.map((point, i) => (
-                      <li key={i}>{point}</li>
-                    ))
-                  ) : (
-                    <>
-                      <li>Concepto principal simplificado.</li>
-                      <li>Relación con ejemplos cotidianos.</li>
-                      <li>Palabras clave resaltadas.</li>
-                    </>
-                  )}
+                  {content.adhd?.keyPoints?.map((point, i) => <li key={i}>{point}</li>)}
                 </ul>
               </div>
               <div className="bg-sky/10 p-6 rounded-2xl flex items-center justify-center min-h-[150px]">
-                <span className="text-dark/50 italic text-center px-4">
-                  {content.adhd?.visualCues?.[0] || "Gráfico o diagrama generado..."}
-                </span>
+                <span className="text-dark/50 italic text-center px-4">{content.adhd?.visualCues?.[0] || "Gráfico o diagrama generado..."}</span>
               </div>
             </div>
             <p className="text-lg leading-relaxed text-dark/80">
-              {content.adhd?.simplifiedText ? (
-                <Typewriter text={content.adhd.simplifiedText} />
-              ) : (
-                "Aquí aparecerá el contenido estructurado en bloques pequeños..."
-              )}
+              {content.adhd?.simplifiedText && <Typewriter text={content.adhd.simplifiedText} />}
             </p>
           </motion.div>
         )}
 
         {mode === 'DYSLEXIA' && (
-          <motion.div 
-            key="dyslexia"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="space-y-6"
-          >
-            <h3 className="text-2xl font-bold text-dark mb-4 flex items-center gap-2 font-dyslexic pr-12">
-              <FileText className="text-mint" />
-              Lectura Adaptada
-            </h3>
+          <motion.div key="dyslexia" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+            <div className="flex items-center justify-between pr-12">
+              <h3 className="text-2xl font-bold text-dark flex items-center gap-2 font-dyslexic">
+                <FileText className="text-mint" />
+                Lectura Adaptada
+              </h3>
+              
+              {/* Botón de Escuchar */}
+              {content.dyslexiaText && (
+                <button
+                  onClick={() => toggleSpeech(content.dyslexiaText!)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
+                    isSpeaking ? 'bg-red-100 text-red-600' : 'bg-mint/10 text-mint hover:bg-mint/20'
+                  }`}
+                >
+                  {isSpeaking ? <Square size={18} fill="currentColor" /> : <Volume2 size={18} />}
+                  <span className="font-medium text-sm">{isSpeaking ? 'Detener' : 'Escuchar'}</span>
+                </button>
+              )}
+            </div>
+
             <div className="prose prose-lg max-w-none">
               <p className="font-dyslexic text-xl leading-loose tracking-wide text-dark whitespace-pre-line">
-                {content.dyslexiaText ? (
-                  <Typewriter text={content.dyslexiaText} speed={25} />
-                ) : (
-                  "El texto adaptado con fuente OpenDyslexic aparecerá aquí..."
-                )}
+                {content.dyslexiaText && <Typewriter text={content.dyslexiaText} speed={25} />}
               </p>
             </div>
           </motion.div>
         )}
 
         {mode === 'QUIZ' && (
-          <motion.div 
-            key="quiz"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="space-y-6"
-          >
+          <motion.div key="quiz" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
             <h3 className="text-2xl font-bold text-dark mb-4 flex items-center gap-2 pr-12">
               <HelpCircle className="text-orange-400" />
               Repaso Interactivo
@@ -138,7 +140,6 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
               {content.quiz?.map((q, i) => {
                 const selectedIdx = selectedOptions[q.id];
                 const isCorrect = selectedIdx === q.correctAnswerIndex;
-
                 return (
                   <div key={q.id} className="p-6 rounded-2xl border-2 border-dark/5 bg-cream">
                     <p className="font-semibold text-lg mb-4">{i + 1}. {q.question}</p>
@@ -146,41 +147,20 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
                       {q.options.map((opt, j) => {
                         const isSelected = selectedIdx === j;
                         const isOptionCorrect = j === q.correctAnswerIndex;
-                        
-                        // Determinar colores de borde y fondo según selección
-                        let buttonClass = "border-dark/5 bg-white";
-                        if (isSelected) {
-                          buttonClass = isOptionCorrect 
-                            ? "border-green-500 bg-green-50" 
-                            : "border-red-500 bg-red-50";
-                        }
-
+                        let buttonClass = isSelected 
+                          ? (isOptionCorrect ? "border-green-500 bg-green-50" : "border-red-500 bg-red-50") 
+                          : "border-dark/5 bg-white hover:border-sky/50";
                         return (
-                          <button
-                            key={j}
-                            onClick={() => handleOptionClick(q.id, j)}
-                            disabled={isCorrect} // Bloquear una vez que se acierta
-                            className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${buttonClass} ${!isCorrect ? 'hover:border-sky/50' : ''}`}
-                          >
+                          <button key={j} onClick={() => handleOptionClick(q.id, j)} disabled={isCorrect} className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${buttonClass}`}>
                             <span>{opt}</span>
-                            {isSelected && isOptionCorrect && <CheckCircle2 className="text-green-500" size={20} />}
-                            {isSelected && !isOptionCorrect && <XCircle className="text-red-500" size={20} />}
+                            {isSelected && (isOptionCorrect ? <CheckCircle2 className="text-green-500" size={20} /> : <XCircle className="text-red-500" size={20} />)}
                           </button>
                         );
                       })}
                     </div>
-                    {selectedIdx !== undefined && (
-                      <p className={`mt-3 font-medium text-sm ${isCorrect ? 'text-green-600' : 'text-red-500'}`}>
-                        {isCorrect ? '¡Correcto!' : 'Respuesta incorrecta. Inténtalo de nuevo.'}
-                      </p>
-                    )}
                   </div>
                 );
-              }) || (
-                <div className="p-6 rounded-2xl border-2 border-dark/5 bg-cream">
-                  <p className="font-semibold text-lg">Cargando preguntas de repaso...</p>
-                </div>
-              )}
+              })}
             </div>
           </motion.div>
         )}
