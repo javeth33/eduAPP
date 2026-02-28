@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Brain, FileText, HelpCircle, Download } from 'lucide-react';
+import { Brain, FileText, HelpCircle, Download, CheckCircle2, XCircle } from 'lucide-react';
 import { ProcessingMode, AdaptedContent } from '@/types';
 import { downloadContent } from '@/utils/downloadUtils';
-import { Typewriter } from './Typewriter'; // Asegúrate de haber creado este archivo
+import { Typewriter } from './Typewriter';
 
 interface ContentDisplayProps {
   mode: ProcessingMode;
@@ -11,7 +11,16 @@ interface ContentDisplayProps {
 }
 
 export function ContentDisplay({ mode, content }: ContentDisplayProps) {
-  // 1. Pantalla de carga (Spinner) mientras Gemini procesa
+  // Estado para rastrear las respuestas seleccionadas por pregunta
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, number>>({});
+
+  const handleOptionClick = (questionId: string, optionIndex: number) => {
+    setSelectedOptions(prev => ({
+      ...prev,
+      [questionId]: optionIndex
+    }));
+  };
+
   if (content.isProcessing) {
     return (
       <div className="bg-white rounded-3xl p-6 md:p-10 shadow-sm border border-dark/5 min-h-[400px] flex flex-col items-center justify-center">
@@ -77,8 +86,6 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
                 </span>
               </div>
             </div>
-            
-            {/* Efecto Typewriter en la respuesta de TDAH */}
             <p className="text-lg leading-relaxed text-dark/80">
               {content.adhd?.simplifiedText ? (
                 <Typewriter text={content.adhd.simplifiedText} />
@@ -103,7 +110,6 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
               Lectura Adaptada
             </h3>
             <div className="prose prose-lg max-w-none">
-              {/* Efecto Typewriter en la respuesta de Dislexia */}
               <p className="font-dyslexic text-xl leading-loose tracking-wide text-dark whitespace-pre-line">
                 {content.dyslexiaText ? (
                   <Typewriter text={content.dyslexiaText} speed={25} />
@@ -128,21 +134,51 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
               <HelpCircle className="text-orange-400" />
               Repaso Interactivo
             </h3>
-            <div className="space-y-4">
-              {content.quiz?.map((q, i) => (
-                <div key={q.id} className="p-6 rounded-2xl border-2 border-dark/5 hover:border-sky/50 cursor-pointer transition-colors bg-cream">
-                  <p className="font-semibold text-lg mb-4">{i + 1}. {q.question}</p>
-                  <div className="space-y-2">
-                    {q.options.map((opt, j) => (
-                      <div key={j} className="p-3 rounded-xl bg-white border border-dark/5 hover:bg-sky/10">
-                        {opt}
-                      </div>
-                    ))}
+            <div className="space-y-6">
+              {content.quiz?.map((q, i) => {
+                const selectedIdx = selectedOptions[q.id];
+                const isCorrect = selectedIdx === q.correctAnswerIndex;
+
+                return (
+                  <div key={q.id} className="p-6 rounded-2xl border-2 border-dark/5 bg-cream">
+                    <p className="font-semibold text-lg mb-4">{i + 1}. {q.question}</p>
+                    <div className="space-y-3">
+                      {q.options.map((opt, j) => {
+                        const isSelected = selectedIdx === j;
+                        const isOptionCorrect = j === q.correctAnswerIndex;
+                        
+                        // Determinar colores de borde y fondo según selección
+                        let buttonClass = "border-dark/5 bg-white";
+                        if (isSelected) {
+                          buttonClass = isOptionCorrect 
+                            ? "border-green-500 bg-green-50" 
+                            : "border-red-500 bg-red-50";
+                        }
+
+                        return (
+                          <button
+                            key={j}
+                            onClick={() => handleOptionClick(q.id, j)}
+                            disabled={isCorrect} // Bloquear una vez que se acierta
+                            className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center justify-between group ${buttonClass} ${!isCorrect ? 'hover:border-sky/50' : ''}`}
+                          >
+                            <span>{opt}</span>
+                            {isSelected && isOptionCorrect && <CheckCircle2 className="text-green-500" size={20} />}
+                            {isSelected && !isOptionCorrect && <XCircle className="text-red-500" size={20} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {selectedIdx !== undefined && (
+                      <p className={`mt-3 font-medium text-sm ${isCorrect ? 'text-green-600' : 'text-red-500'}`}>
+                        {isCorrect ? '¡Correcto!' : 'Respuesta incorrecta. Inténtalo de nuevo.'}
+                      </p>
+                    )}
                   </div>
-                </div>
-              )) || (
-                <div className="p-6 rounded-2xl border-2 border-dark/5 hover:border-sky/50 cursor-pointer transition-colors bg-cream">
-                  <p className="font-semibold text-lg mb-4">Cargando preguntas de repaso...</p>
+                );
+              }) || (
+                <div className="p-6 rounded-2xl border-2 border-dark/5 bg-cream">
+                  <p className="font-semibold text-lg">Cargando preguntas de repaso...</p>
                 </div>
               )}
             </div>
