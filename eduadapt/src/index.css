@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Montserrat", sans-serif;
+  --font-dyslexic: "OpenDyslexic", sans-serif;
+  
+  --color-cream: #FEFDF5;
+  --color-sky: #A4D8F0;
+  --color-mint: #A8E6CF;
+  --color-dark: #333333;
+}
+
+:root {
+  font-family: var(--font-sans);
+  background-color: var(--color-cream);
+  color: var(--color-dark);
+}
+
+/* Custom scrollbar for better accessibility/visibility if needed, keeping it subtle */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #bbb;
+}
+/* Forzar la tipografía en la clase que AI Studio generó para dislexia */
+.font-dyslexic, 
+[data-mode="DYSLEXIA"] p, 
+.dyslexia-text {
+  font-family: 'OpenDyslexic', sans-serif !important;
+}
