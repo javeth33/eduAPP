@@ -1,13 +1,16 @@
 import os
 import uuid
 import json
-import fitz  # PyMuPDF
+import fitz
 from io import BytesIO
+import io
 from PIL import Image
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from gtts import gTTS
 import google.generativeai as genai
 from supabase import create_client
 
@@ -25,69 +28,51 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─── Prompts por perfil ────────────────────────────────────
+# ─── Prompts ──────────────────────────────────────────────
 PROMPTS = {
     "tdah": """
-Eres un diseñador pedagógico especializado en Universal Design for Learning (UDL)
-y teoría de carga cognitiva de Sweller. Adapta el texto para estudiantes con TDAH.
+Eres un diseñador pedagógico especializado en Universal Design for Learning (UDL).
+Adapta el texto para estudiantes con TDAH.
 
 REGLAS:
-- Divide en bloques de MÁXIMO 40 palabras
-- Una sola idea por bloque
-- Emoji relevante al inicio de cada bloque
-- Identifica 3 conceptos difíciles con analogía mexicana (fútbol/tacos/TikTok)
-- Resalta verbos de acción
-- 2 preguntas de verificación al final
-- Genera diagrama Mermaid simple del tema
+- Divide en bloques de MÁXIMO 30 palabras.
+- Una sola idea por bloque.
+- Usa un emoji relevante al inicio de cada bloque.
+- NO resaltes verbos. Solo pon en **negrita** el concepto más importante del bloque (máximo 3 palabras por bloque).
+- Usa un tono dinámico y directo.
 
 TEXTO: {texto}
 
-Responde SOLO en este JSON sin texto adicional:
+Responde SOLO en este JSON:
 {{
-  "resumen": "3 oraciones máximo",
-  "bloques": ["🎯 bloque1", "⚡ bloque2"],
-  "glosario": [
-    {{"termino": "palabra", "definicion": "analogía mexicana simple"}}
-  ],
-  "mapa_mermaid": "graph TD\\n A[Concepto] --> B[Sub-concepto]",
-  "quiz": [
-    {{"pregunta": "pregunta", "opciones": ["A", "B", "C"], "respuesta": 0}}
-  ],
-  "resumen_oral": "versión corta para audio, máx 3 oraciones",
-  "nivel_complejidad": 7
+  "resumen": "1 oración gancho para atrapar la atención",
+  "bloques": ["🎯 bloque 1", "⚡ bloque 2"],
+  "glosario": [{{"termino": "Concepto", "definicion": "Analogía con la vida real o cultura pop"}}],
+  "mapa_mermaid": "graph TD\\n A[Idea Principal] --> B[Detalle]",
+  "quiz": [{{"pregunta": "Pregunta rápida", "opciones": ["A", "B", "C"], "respuesta": 0}}]
 }}
 """,
-
     "dislexia": """
-Eres un diseñador pedagógico especializado en dislexia y UDL.
+Eres un diseñador pedagógico especializado en dislexia.
 
-REGLAS:
-- Bloques de MÁXIMO 30 palabras
-- Separa sílabas en palabras de más de 6 letras: (fo-to-sín-te-sis)
-- Oraciones simples: Sujeto + Verbo + Objeto
-- Sustituye palabras rebuscadas por palabras comunes
-- 3 conceptos clave con analogía mexicana muy simple
-- 2 preguntas simples de verificación
-- Diagrama Mermaid muy simple (máx 4 nodos)
+REGLAS ESTRICTAS:
+- PROHIBIDO usar negritas (**), cursivas o subrayados en el texto.
+- Oraciones cortas: Sujeto + Verbo + Objeto.
+- Párrafos de máximo 2 líneas.
+- Sustituye palabras complejas por palabras muy comunes.
+- El tono debe ser calmado y explicativo.
 
 TEXTO: {texto}
 
-Responde SOLO en este JSON sin texto adicional:
+Responde SOLO en este JSON:
 {{
-  "resumen": "2 oraciones simples",
-  "bloques": ["bloque1", "bloque2"],
-  "glosario": [
-    {{"termino": "palabra", "definicion": "explicación simple"}}
-  ],
-  "mapa_mermaid": "graph TD\\n A[Idea] --> B[Resultado]",
-  "quiz": [
-    {{"pregunta": "pregunta simple", "opciones": ["A", "B", "C"], "respuesta": 0}}
-  ],
-  "resumen_oral": "versión muy simple para escuchar",
-  "nivel_complejidad": 5
+  "resumen": "Resumen de 2 oraciones muy simples.",
+  "bloques": ["Oración simple 1.", "Oración simple 2."],
+  "glosario": [{{"termino": "palabra", "definicion": "explicación simple sin tecnicismos"}}],
+  "mapa_mermaid": "graph TD\\n A[Paso 1] --> B[Paso 2]",
+  "quiz": [{{"pregunta": "Pregunta clara", "opciones": ["A", "B", "C"], "respuesta": 0}}]
 }}
 """,
-
     "auditivo": """
 Eres un diseñador pedagógico especializado en aprendizaje auditivo y UDL.
 
@@ -105,56 +90,45 @@ Responde SOLO en este JSON sin texto adicional:
 {{
   "resumen": "intro estilo podcast, 2 oraciones",
   "bloques": ["bloque narrativo 1", "bloque narrativo 2"],
-  "glosario": [
-    {{"termino": "palabra", "definicion": "metáfora auditiva o narrativa"}}
-  ],
+  "glosario": [{{"termino": "palabra", "definicion": "metáfora auditiva o narrativa"}}],
   "mapa_mermaid": "graph TD\\n A[Concepto] --> B[Ejemplo]",
-  "quiz": [
-    {{"pregunta": "pregunta reflexiva", "opciones": ["A", "B", "C"], "respuesta": 0}}
-  ],
+  "quiz": [{{"pregunta": "pregunta reflexiva", "opciones": ["A", "B", "C"], "respuesta": 0}}],
   "resumen_oral": "guión completo para narrar en voz alta",
   "nivel_complejidad": 6
 }}
 """
 }
 
-# ─── Modelos de datos ──────────────────────────────────────
+# ─── Modelos ──────────────────────────────────────────────
 class TextInput(BaseModel):
     texto: str
     perfil: str
     session_id: str | None = None
 
-class ShareRequest(BaseModel):
-    content_json: dict
-    perfil: str
-    texto_original: str
-    session_id: str | None = None
-
-# ─── Función central de adaptación ────────────────────────
+# ─── Función central con retry ────────────────────────────
 async def adaptar_texto(texto: str, perfil: str) -> dict:
     if perfil not in PROMPTS:
         raise HTTPException(status_code=400, detail="Perfil no válido. Usa: tdah, dislexia, auditivo")
 
     prompt = PROMPTS[perfil].format(texto=texto)
 
-    try:
-        response = model.generate_content(prompt)
-        raw = response.text.strip()
+    for intento in range(2):
+        try:
+            response = await model.generate_content_async(
+                prompt,
+                generation_config={"response_mime_type": "application/json"}
+            )
+            return json.loads(response.text)
 
-        # Limpia markdown si Gemini lo agrega
-        if "```" in raw:
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
+        except json.JSONDecodeError:
+            if intento == 1:
+                raise HTTPException(status_code=500, detail="Gemini no devolvió JSON válido")
+            continue
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
-        return json.loads(raw.strip())
 
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Error procesando respuesta de Gemini")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ─── Guardar en Supabase ───────────────────────────────────
+# ─── Guardar en Supabase ──────────────────────────────────
 def guardar_adaptacion(share_id, session_id, perfil, texto_original,
                        content_json, file_url=None, file_type=None):
     supabase.table("adaptations").insert({
@@ -177,37 +151,29 @@ def root():
 def health():
     return {"status": "ok"}
 
-
-# 1. Adaptar texto directo
+# 1. Adaptar texto
 @app.post("/adapt/text")
 async def adapt_text(input: TextInput):
     resultado = await adaptar_texto(input.texto, input.perfil)
     share_id = str(uuid.uuid4())[:8]
-
-    guardar_adaptacion(
-        share_id=share_id,
-        session_id=input.session_id,
-        perfil=input.perfil,
-        texto_original=input.texto,
-        content_json=resultado,
-        file_type="text"
-    )
-
+    guardar_adaptacion(share_id, input.session_id, input.perfil,
+                       input.texto, resultado, file_type="text")
     return {"share_id": share_id, "resultado": resultado}
 
-
-# 2. Adaptar desde imagen o PDF
+# 2. Adaptar imagen o PDF
 @app.post("/adapt/file")
 async def adapt_file(
     file: UploadFile = File(...),
     perfil: str = Form(...),
     session_id: str = Form(None)
 ):
+    if file.content_type not in ["application/pdf", "image/jpeg", "image/png", "image/webp"]:
+        raise HTTPException(status_code=400, detail="Solo se aceptan PDF, JPG, PNG o WEBP")
+    
     contents = await file.read()
     filename = f"{uuid.uuid4()}_{file.filename}"
     file_type = file.content_type
 
-    # ── Sube a Supabase Storage ──
     supabase.storage.from_("uploads").upload(
         path=filename,
         file=contents,
@@ -215,7 +181,6 @@ async def adapt_file(
     )
     file_url = supabase.storage.from_("uploads").get_public_url(filename)
 
-    # ── Extrae texto ──
     if file_type == "application/pdf":
         pdf = fitz.open(stream=contents, filetype="pdf")
         texto_extraido = "".join(page.get_text() for page in pdf)
@@ -227,19 +192,10 @@ async def adapt_file(
         ])
         texto_extraido = response.text.strip()
 
-    # ── Adapta ──
     resultado = await adaptar_texto(texto_extraido, perfil)
     share_id = str(uuid.uuid4())[:8]
-
-    guardar_adaptacion(
-        share_id=share_id,
-        session_id=session_id,
-        perfil=perfil,
-        texto_original=texto_extraido,
-        content_json=resultado,
-        file_url=file_url,
-        file_type=file_type
-    )
+    guardar_adaptacion(share_id, session_id, perfil,
+                       texto_extraido, resultado, file_url, file_type)
 
     return {
         "share_id": share_id,
@@ -248,29 +204,31 @@ async def adapt_file(
         "resultado": resultado
     }
 
-
-# 3. Ver contenido compartido (Modo Maestro)
+# 3. Ver contenido compartido
 @app.get("/view/{share_id}")
 async def view_content(share_id: str):
-    response = supabase.table("adaptations")\
-        .select("*")\
-        .eq("share_id", share_id)\
-        .single()\
-        .execute()
-
-    if not response.data:
+    try:
+        response = supabase.table("adaptations").select("*").eq("share_id", share_id).single().execute()
+    except Exception:
         raise HTTPException(status_code=404, detail="Link no encontrado")
-
-    # Suma una vista
-    supabase.table("adaptations")\
-        .update({"vistas": response.data["vistas"] + 1})\
-        .eq("share_id", share_id)\
-        .execute()
-
+    supabase.table("adaptations").update({"vistas": response.data["vistas"] + 1}).eq("share_id", share_id).execute()
     return response.data
 
+# 4. Comparar antes y después
+@app.get("/compare/{share_id}")
+async def compare(share_id: str):
+    try:
+        response = supabase.table("adaptations").select("texto_original, content_json, perfil, created_at").eq("share_id", share_id).single().execute()
+    except Exception:
+        raise HTTPException(status_code=404, detail="No encontrado")
+    return {
+        "antes": response.data["texto_original"],
+        "despues": response.data["content_json"],
+        "perfil": response.data["perfil"],
+        "created_at": response.data["created_at"]
+    }
 
-# 4. Historial por sesión
+# 5. Historial por sesión
 @app.get("/history/{session_id}")
 async def get_history(session_id: str):
     response = supabase.table("adaptations")\
@@ -279,5 +237,44 @@ async def get_history(session_id: str):
         .order("created_at", desc=True)\
         .limit(10)\
         .execute()
-
     return {"history": response.data}
+
+# 6. Audio del contenido adaptado
+# 6. Audio del contenido adaptado
+@app.post("/audio/{share_id}")
+async def get_audio(share_id: str):
+    try:
+        response = supabase.table("adaptations").select("content_json").eq("share_id", share_id).single().execute()
+    except Exception:
+        raise HTTPException(status_code=404, detail="No encontrado")
+    
+    # Usamos .get() para evitar el KeyError
+    content = response.data["content_json"]
+    texto = content.get("resumen_oral", content.get("resumen", "No hay texto disponible para leer."))
+    
+    tts = gTTS(text=texto, lang="es", slow=False)
+    audio_buffer = io.BytesIO()
+    tts.write_to_fp(audio_buffer)
+    audio_buffer.seek(0)
+    return StreamingResponse(audio_buffer, media_type="audio/mpeg")
+
+# 7. Estadísticas en tiempo real
+@app.get("/stats")
+async def get_stats():
+    total = supabase.table("adaptations")\
+        .select("id", count="exact")\
+        .execute()
+    rows = supabase.table("adaptations")\
+        .select("perfil, vistas")\
+        .execute()
+    perfiles = {}
+    vistas = 0
+    for row in rows.data:
+        p = row["perfil"]
+        perfiles[p] = perfiles.get(p, 0) + 1
+        vistas += row["vistas"]
+    return {
+        "total_adaptaciones": total.count,
+        "por_perfil": perfiles,
+        "total_vistas": vistas
+    }
