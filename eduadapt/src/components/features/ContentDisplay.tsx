@@ -6,15 +6,29 @@ import { downloadContent } from '@/utils/downloadUtils';
 
 interface ContentDisplayProps {
   mode: ProcessingMode;
-  content: AdaptedContent;
+  // Usamos 'any' temporalmente si tu type AdaptedContent aún no tiene las nuevas propiedades del backend
+  content: any; 
 }
 
+// 🪄 Función mágica para convertir los asteriscos ** de Gemini en negritas reales
+const formatBoldText = (text?: string) => {
+  if (!text) return null;
+  const parts = text.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={index} className="font-bold text-gray-900">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
+};
+
 export function ContentDisplay({ mode, content }: ContentDisplayProps) {
-  const hasContent = (
-    (mode === 'ADHD' && content.adhd) ||
-    (mode === 'DYSLEXIA' && content.dyslexiaText) ||
-    (mode === 'QUIZ' && content.quiz)
-  );
+  // Verificamos si hay contenido validando las nuevas propiedades del backend
+  const hasContent = content && (content.resumen || content.bloques || content.quiz);
 
   return (
     <div className="bg-white rounded-3xl p-6 md:p-10 shadow-sm border border-dark/5 min-h-[400px] relative">
@@ -30,6 +44,7 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
       )}
 
       <AnimatePresence mode="wait">
+        {/* 🧠 MODO TDAH */}
         {mode === 'ADHD' && (
           <motion.div 
             key="adhd"
@@ -43,33 +58,57 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
               <Brain className="text-sky" />
               Resumen Visual
             </h3>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="bg-cream p-6 rounded-2xl border-l-4 border-sky">
-                <h4 className="font-bold text-lg mb-2">Puntos Clave</h4>
-                <ul className="list-disc list-inside space-y-2 text-dark/80">
-                  {content.adhd?.keyPoints.map((point, i) => (
-                    <li key={i}>{point}</li>
-                  )) || (
-                    <>
-                      <li>Concepto principal simplificado.</li>
-                      <li>Relación con ejemplos cotidianos.</li>
-                      <li>Palabras clave resaltadas.</li>
-                    </>
-                  )}
-                </ul>
+            
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Columna Izquierda: Lectura en bloques cortos */}
+              <div className="space-y-4">
+                {content.resumen && (
+                  <p className="text-lg font-semibold text-dark/90 pb-3 border-b border-dark/10">
+                    {formatBoldText(content.resumen)}
+                  </p>
+                )}
+                
+                <div className="space-y-3">
+                  {content.bloques?.map((bloque: string, index: number) => (
+                    <div key={index} className="bg-cream p-4 rounded-xl border-l-4 border-sky">
+                      <p className="text-dark/80 leading-relaxed">
+                        {formatBoldText(bloque)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="bg-sky/10 p-6 rounded-2xl flex items-center justify-center min-h-[150px]">
-                <span className="text-dark/50 italic">
-                  {content.adhd?.visualCues?.[0] || "Gráfico o diagrama generado..."}
-                </span>
+
+              {/* Columna Derecha: Glosario y Mapa */}
+              <div className="space-y-6">
+                {content.glosario && content.glosario.length > 0 && (
+                  <div className="bg-sky/10 p-5 rounded-2xl">
+                    <h4 className="font-bold text-lg mb-3 flex items-center gap-2">📚 Glosario Rápido</h4>
+                    <ul className="space-y-3">
+                      {content.glosario.map((item: any, idx: number) => (
+                        <li key={idx} className="bg-white p-3 rounded-xl shadow-sm">
+                          <span className="font-bold text-sky block">{item.termino}</span>
+                          <span className="text-dark/70 text-sm mt-1 block">{item.definicion}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {content.mapa_mermaid && (
+                  <div className="bg-gray-50 p-5 rounded-2xl border border-dark/5">
+                    <h4 className="font-bold text-lg mb-3">🗺️ Mapa Conceptual</h4>
+                    <pre className="text-xs text-dark/50 overflow-x-auto p-3 bg-white rounded-xl">
+                      {content.mapa_mermaid}
+                    </pre>
+                  </div>
+                )}
               </div>
             </div>
-            <p className="text-lg leading-relaxed text-dark/80">
-              {content.adhd?.simplifiedText || "Aquí aparecerá el contenido estructurado en bloques pequeños y fáciles de digerir, eliminando el ruido visual innecesario."}
-            </p>
           </motion.div>
         )}
 
+        {/* 📄 MODO DISLEXIA */}
         {mode === 'DYSLEXIA' && (
           <motion.div 
             key="dyslexia"
@@ -83,16 +122,28 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
               <FileText className="text-mint" />
               Lectura Adaptada
             </h3>
-            <div className="prose prose-lg max-w-none">
-              <p className="font-dyslexic text-xl leading-loose tracking-wide text-dark whitespace-pre-line">
-                {content.dyslexiaText || `Este es un ejemplo de cómo se vería el texto adaptado. La fuente OpenDyslexic, junto con un espaciado mayor entre líneas y letras, facilita la lectura y reduce la confusión visual.
-                
-                El fondo crema suave reduce el deslumbramiento y el contraste agresivo del blanco puro sobre negro.`}
-              </p>
+            
+            <div className="max-w-3xl space-y-6">
+              {content.resumen && (
+                <div className="bg-mint/10 p-5 rounded-2xl">
+                  <p className="font-dyslexic text-xl leading-loose tracking-wide text-dark">
+                    {formatBoldText(content.resumen)}
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-6 mt-6">
+                {content.bloques?.map((bloque: string, index: number) => (
+                  <p key={index} className="font-dyslexic text-xl leading-loose tracking-wide text-dark/90">
+                    {formatBoldText(bloque)}
+                  </p>
+                ))}
+              </div>
             </div>
           </motion.div>
         )}
 
+        {/* ❓ MODO QUIZ (Se queda casi igual, solo validamos la nueva estructura) */}
         {mode === 'QUIZ' && (
           <motion.div 
             key="quiz"
@@ -107,26 +158,18 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
               Repaso Interactivo
             </h3>
             <div className="space-y-4">
-              {content.quiz?.map((q, i) => (
-                <div key={q.id} className="p-6 rounded-2xl border-2 border-dark/5 hover:border-sky/50 cursor-pointer transition-colors bg-cream">
-                  <p className="font-semibold text-lg mb-4">{i + 1}. {q.question}</p>
+              {content.quiz?.map((q: any, i: number) => (
+                <div key={i} className="p-6 rounded-2xl border-2 border-dark/5 hover:border-sky/50 cursor-pointer transition-colors bg-cream">
+                  <p className="font-semibold text-lg mb-4">{i + 1}. {q.pregunta || q.question}</p>
                   <div className="space-y-2">
-                    {q.options.map((opt, j) => (
+                    {(q.opciones || q.options)?.map((opt: string, j: number) => (
                       <div key={j} className="p-3 rounded-xl bg-white border border-dark/5 hover:bg-sky/10">
                         {opt}
                       </div>
                     ))}
                   </div>
                 </div>
-              )) || (
-                <div className="p-6 rounded-2xl border-2 border-dark/5 hover:border-sky/50 cursor-pointer transition-colors bg-cream">
-                  <p className="font-semibold text-lg mb-4">1. ¿Cuál es la idea principal del texto?</p>
-                  <div className="space-y-2">
-                    <div className="p-3 rounded-xl bg-white border border-dark/5 hover:bg-sky/10">Opción A: Resumen histórico</div>
-                    <div className="p-3 rounded-xl bg-white border border-dark/5 hover:bg-sky/10">Opción B: Análisis científico</div>
-                  </div>
-                </div>
-              )}
+              ))}
             </div>
           </motion.div>
         )}
