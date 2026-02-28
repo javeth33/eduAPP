@@ -18,6 +18,7 @@ export interface AdaptedContent {
   adhd: AdhdSummary | null;
   dyslexiaText: string | null;
   quiz: QuizQuestion[] | null;
+  mermaidMap: string | null; //grafico de mermaid
   isProcessing: boolean;
   error: string | null;
 }

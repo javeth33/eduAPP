@@ -14,6 +14,7 @@ export default function App() {
     adhd: null,
     dyslexiaText: null,
     quiz: null,
+    mermaidMap: null,
     isProcessing: false,
     error: null
   });
@@ -47,6 +48,7 @@ export default function App() {
           options: q.opciones,
           correctAnswerIndex: q.respuesta
         })),
+         mermaidMap: result.mapa_mermaid || null, //mapeo directo del back
         isProcessing: false,
         error: null
       });

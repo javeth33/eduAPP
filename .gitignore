@@ -1,1 +1,14 @@
 eduadapt-backend/.env
+
+
+# Python
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Backend accidental npm
+eduadapt-backend/package-lock.json
+package.json
+package-lock.json
