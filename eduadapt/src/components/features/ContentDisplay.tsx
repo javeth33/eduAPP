@@ -193,8 +193,25 @@ function MapModal({ chart, onClose }: { chart: string; onClose: () => void }) {
 // ─── ContentDisplay principal ─────────────────────────────────
 interface ContentDisplayProps {
   mode: ProcessingMode;
-  content: AdaptedContent;
+  // Usamos 'any' temporalmente si tu type AdaptedContent aún no tiene las nuevas propiedades del backend
+  content: any; 
 }
+
+// 🪄 Función mágica para convertir los asteriscos ** de Gemini en negritas reales
+const formatBoldText = (text?: string) => {
+  if (!text) return null;
+  const parts = text.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={index} className="font-bold text-gray-900">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
+};
 
 export function ContentDisplay({ mode, content }: ContentDisplayProps) {
   const [selectedOptions, setSelectedOptions] = useState<Record<string, number>>({});
@@ -202,6 +219,7 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const hasContent = content && (content.resumen || content.bloques || content.quiz);
 
   useEffect(() => {
     synthRef.current = window.speechSynthesis;
@@ -259,41 +277,41 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
           </button>
         )}
 
-        <AnimatePresence mode="wait">
+      <AnimatePresence mode="wait">
+        {mode === 'ADHD' && (
+          <motion.div 
+            key="adhd"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-6"
+          >
+            <h3 className="text-2xl font-bold text-dark mb-4 flex items-center gap-2 pr-12">
+              <Brain className="text-sky" />
+              Resumen Visual
+            </h3>
 
-          {/* ── TDAH ──────────────────────────────────── */}
-          {mode === 'ADHD' && (
-            <motion.div
-              key="adhd"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-              className="space-y-6"
-            >
-              <h3 className="text-2xl font-bold text-dark mb-4 flex items-center gap-2 pr-12">
-                <Brain className="text-sky" />
-                Resumen Visual
-              </h3>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                {/* Columna izquierda: puntos clave */}
-                <div className="bg-cream p-6 rounded-2xl border-l-4 border-sky">
-                  <h4 className="font-bold text-lg mb-2">Puntos Clave</h4>
-                  <ul className="list-disc list-inside space-y-2 text-dark/80">
-                    {content.adhd?.keyPoints.map((point, i) => (
-                      <li key={i}>{point}</li>
-                    )) || (
-                      <>
-                        <li>Concepto principal simplificado.</li>
-                        <li>Relación con ejemplos cotidianos.</li>
-                        <li>Palabras clave resaltadas.</li>
-                      </>
-                    )}
-                  </ul>
+             <div className="grid gap-6 md:grid-cols-2">
+              {/* Columna Izquierda: Lectura en bloques cortos */}
+              <div className="space-y-4">
+                {content.resumen && (
+                  <p className="text-lg font-semibold text-dark/90 pb-3 border-b border-dark/10">
+                    {formatBoldText(content.resumen)}
+                  </p>
+                )}
+                
+                <div className="space-y-3">
+                  {content.bloques?.map((bloque: string, index: number) => (
+                    <div key={index} className="bg-cream p-4 rounded-xl border-l-4 border-sky">
+                      <p className="text-dark/80 leading-relaxed">
+                        {formatBoldText(bloque)}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-
-                {/* Columna derecha: mapa mental o placeholder */}
+              </div>
+              {/* Columna derecha: mapa mental o placeholder */}
                 {content.mermaidMap ? (
                   <button
                     onClick={() => setMapOpen(true)}  // ← abre el modal
@@ -320,14 +338,32 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
                       El mapa mental aparecerá aquí al procesar un archivo
                     </span>
                   </div>
-                )}
-              </div>
 
-              <p className="text-lg leading-relaxed text-dark/80">
-                {content.adhd?.simplifiedText && <Typewriter text={content.adhd.simplifiedText} />}
-              </p>
-            </motion.div>
-          )}
+                  
+
+              {/* Columna Derecha: Glosario y Mapa */}
+              <div className="space-y-6">
+                {content.glosario && content.glosario.length > 0 && (
+                  <div className="bg-sky/10 p-5 rounded-2xl">
+                    <h4 className="font-bold text-lg mb-3 flex items-center gap-2">📚 Glosario Rápido</h4>
+                    <ul className="space-y-3">
+                      {content.glosario.map((item: any, idx: number) => (
+                        <li key={idx} className="bg-white p-3 rounded-xl shadow-sm">
+                          <span className="font-bold text-sky block">{item.termino}</span>
+                          <span className="text-dark/70 text-sm mt-1 block">{item.definicion}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+            
+
+            
+            <p className="text-lg leading-relaxed text-dark/80">
+              {content.adhd?.simplifiedText || "Aquí aparecerá el contenido estructurado en bloques pequeños y fáciles de digerir, eliminando el ruido visual innecesario."}
+            </p>
+          </motion.div>
+        )}
 
           {/* ── DISLEXIA ──────────────────────────────── */}
           {mode === 'DYSLEXIA' && (
@@ -356,10 +392,21 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
                   </button>
                 )}
               </div>
-              <div className="prose prose-lg max-w-none">
-                <p className="font-dyslexic text-xl leading-loose tracking-wide text-dark whitespace-pre-line">
-                  {content.dyslexiaText && <Typewriter text={content.dyslexiaText} speed={25} />}
-                </p>
+               <div className="max-w-3xl space-y-6">
+              {content.resumen && (
+                <div className="bg-mint/10 p-5 rounded-2xl">
+                  <p className="font-dyslexic text-xl leading-loose tracking-wide text-dark">
+                    {formatBoldText(content.resumen)}
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-6 mt-6">
+                {content.bloques?.map((bloque: string, index: number) => (
+                  <p key={index} className="font-dyslexic text-xl leading-loose tracking-wide text-dark/90">
+                    {formatBoldText(bloque)}
+                  </p>
+                ))}
               </div>
             </motion.div>
           )}
@@ -379,7 +426,7 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
                 Repaso Interactivo
               </h3>
               <div className="space-y-6">
-                {content.quiz?.map((q, i) => {
+                {content.quiz?.map((q: any, i: number) => {
                   const selectedIdx = selectedOptions[q.id];
                   const isCorrect = selectedIdx === q.correctAnswerIndex;
                   return (
