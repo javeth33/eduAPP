@@ -5,10 +5,12 @@ export const aiService = {
     formData.append('perfil', perfil); // El nuevo backend exige el perfil (tdah, dislexia, auditivo)
 
     try {
-      const response = await fetch('http://localhost:8000/adapt/file', {
-        method: 'POST',
-        body: formData
-      });
+      const API_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:8000';
+
+const response = await fetch(`${API_URL}/adapt/file`, {
+  method: 'POST',
+  body: formData
+});
 
       if (!response.ok) {
         throw new Error(`Error en el servidor: ${response.statusText}`);
