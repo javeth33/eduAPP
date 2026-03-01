@@ -1,11 +1,13 @@
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 export const aiService = {
   async adaptarMaterial(file: File, perfil: string = 'tdah') {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('perfil', perfil); // El nuevo backend exige el perfil (tdah, dislexia, auditivo)
+    formData.append('perfil', perfil);
 
     try {
-      const response = await fetch('http://localhost:8000/adapt/file', {
+      const response = await fetch(`${BASE_URL}/adapt/file`, {
         method: 'POST',
         body: formData
       });
@@ -15,10 +17,7 @@ export const aiService = {
       }
 
       const data = await response.json();
-      
-      // El nuevo backend devuelve los datos dentro de una clave llamada 'resultado'
-      // y usa nombres en español: 'resumen', 'bloques', 'glosario', 'quiz'
-      return data.resultado; 
+      return data.resultado;
 
     } catch (error) {
       console.error("Error en la conexión:", error);
