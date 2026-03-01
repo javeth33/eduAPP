@@ -11,4 +11,4 @@ node_modules/
 # Backend accidental npm
 eduadapt-backend/package-lock.json
 package.json
-package-lock.json
+package-lock.json__pycache__/
