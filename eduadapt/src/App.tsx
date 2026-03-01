@@ -9,46 +9,65 @@ import { aiService } from '@/services/aiService';
 
 export default function App() {
   const [activeMode, setActiveMode] = useState<ProcessingMode>('ADHD');
-  
-  // Usamos 'any' para aceptar libremente el nuevo JSON del backend sin pelear con TypeScript hoy
   const [content, setContent] = useState<any>({
+    originalText: '',
+    adhd: null,
+    dyslexiaText: null,
+    quiz: null,
+    mermaidMap: null,
     isProcessing: false,
     error: null
   });
 
   const handleFileSelect = async (file: File) => {
-    // 1. Iniciamos estado de carga
-    setContent({ 
-      isProcessing: true, 
-      error: null 
-    });
+  // 1. Activar carga y limpiar contenido previo para que no se vea lo viejo
+  setContent(prev => ({ 
+    ...prev, 
+    isProcessing: true, 
+    adhd: null, 
+    dyslexiaText: null, 
+    quiz: null,
+    error: null 
+  }));
 
     try {
-      // 2. Mandamos el activeMode actual (ADHD o DYSLEXIA)
-      // Nuestro aiService se encargará de traducirlo a 'tdah' o 'dislexia'
-      const result = await aiService.adaptarMaterial(file, activeMode);
-      console.log("¡Datos recibidos puritos!", result);
+      // 2. Llamada única al nuevo endpoint del backend
+      const result = await aiService.adaptarMaterial(file, 'tdah');
+      console.log("¡Datos recibidos!", result);
 
-      // 3. Guardamos el JSON directo como viene de FastAPI
+      // 3. MAPEADO DE DATOS: Conectamos el JSON de Python con tu React
       setContent({
         resumen: result.resumen,
         bloques: result.bloques,
         glosario: result.glosario,
         mapa_mermaid: result.mapa_mermaid,
-        quiz: result.quiz,
+        //quiz: result.quiz,
+        originalText: result.resumen,
+        adhd: {
+          keyPoints: result.bloques,
+          simplifiedText: result.resumen,
+          visualCues: result.glosario.map((g: any) => `${g.termino}: ${g.definicion}`)
+        },
+        dyslexiaText: result.resumen_oral || result.resumen,
+        quiz: result.quiz.map((q: any, index: number) => ({
+          id: String(index),
+          question: q.pregunta,
+          options: q.opciones,
+          correctAnswerIndex: q.respuesta
+        })),
         isProcessing: false,
         error: null
       });
       
     } catch (error) {
       console.error("Error:", error);
-      setContent({ 
+      setContent(prev => ({ 
+        ...prev, 
         isProcessing: false, 
         error: "Error al conectar. ¿Está encendido el servidor y tienes el bucket 'uploads' en Supabase?" 
-      });
+      }));
     }
   };
-
   return (
     <div className="min-h-screen flex flex-col bg-cream text-dark font-sans selection:bg-sky/30">
       <Header />
@@ -62,7 +81,7 @@ export default function App() {
               Si ya terminó, ContentDisplay hace su magia */}
           {content.isProcessing ? (
             <div className="text-center p-10 bg-white rounded-3xl shadow-sm border border-sky/20">
-              <p className="text-xl font-bold text-sky animate-pulse">🧠 Analizando y adaptando material...</p>
+              <p className="text-xl font-bold text-sky animate-pulse"> Analizando y adaptando material...</p>
             </div>
           ) : (
             <ContentDisplay mode={activeMode} content={content} />
