@@ -6,11 +6,10 @@ import { downloadContent } from '@/utils/downloadUtils';
 
 interface ContentDisplayProps {
   mode: ProcessingMode;
-  // Usamos 'any' temporalmente si tu type AdaptedContent aún no tiene las nuevas propiedades del backend
-  content: any; 
+  content: any;
 }
 
-// 🪄 Función mágica para convertir los asteriscos ** de Gemini en negritas reales
+// Convierte **texto** en <strong>
 const formatBoldText = (text?: string) => {
   if (!text) return null;
   const parts = text.split(/(\*\*.*?\*\*)/g);
@@ -26,8 +25,21 @@ const formatBoldText = (text?: string) => {
   });
 };
 
+// Quita "(N palabras)" del final de un bloque
+const quitarConteo = (text: string) => text.replace(/\s*\(\d+\s*palabras?\)\s*$/i, '').trim();
+
+// Quita emojis de un texto
+const quitarEmojis = (text: string) =>
+  text.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').trim();
+
+// Limpia un bloque: quita conteo y opcionalmente emojis
+const limpiarBloque = (text: string, sinEmojis = false) => {
+  let result = quitarConteo(text);
+  if (sinEmojis) result = quitarEmojis(result);
+  return result;
+};
+
 export function ContentDisplay({ mode, content }: ContentDisplayProps) {
-  // Verificamos si hay contenido validando las nuevas propiedades del backend
   const hasContent = content && (content.resumen || content.bloques || content.quiz);
 
   return (
@@ -44,9 +56,10 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
       )}
 
       <AnimatePresence mode="wait">
+
         {/* 🧠 MODO TDAH */}
         {mode === 'ADHD' && (
-          <motion.div 
+          <motion.div
             key="adhd"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -58,28 +71,27 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
               <Brain className="text-sky" />
               Resumen Visual
             </h3>
-            
+
             <div className="grid gap-6 md:grid-cols-2">
-              {/* Columna Izquierda: Lectura en bloques cortos */}
+              {/* Columna Izquierda */}
               <div className="space-y-4">
                 {content.resumen && (
                   <p className="text-lg font-semibold text-dark/90 pb-3 border-b border-dark/10">
-                    {formatBoldText(content.resumen)}
+                    {formatBoldText(quitarConteo(content.resumen))}
                   </p>
                 )}
-                
                 <div className="space-y-3">
                   {content.bloques?.map((bloque: string, index: number) => (
                     <div key={index} className="bg-cream p-4 rounded-xl border-l-4 border-sky">
                       <p className="text-dark/80 leading-relaxed">
-                        {formatBoldText(bloque)}
+                        {formatBoldText(limpiarBloque(bloque))}
                       </p>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Columna Derecha: Glosario y Mapa */}
+              {/* Columna Derecha: solo Glosario */}
               <div className="space-y-6">
                 {content.glosario && content.glosario.length > 0 && (
                   <div className="bg-sky/10 p-5 rounded-2xl">
@@ -88,21 +100,15 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
                       {content.glosario.map((item: any, idx: number) => (
                         <li key={idx} className="bg-white p-3 rounded-xl shadow-sm">
                           <span className="font-bold text-sky block">{item.termino}</span>
-                          <span className="text-dark/70 text-sm mt-1 block">{item.definicion}</span>
+                          <span className="text-dark/70 text-sm mt-1 block">
+                            {formatBoldText(item.definicion)}
+                          </span>
                         </li>
                       ))}
                     </ul>
                   </div>
                 )}
-
-                {content.mapa_mermaid && (
-                  <div className="bg-gray-50 p-5 rounded-2xl border border-dark/5">
-                    <h4 className="font-bold text-lg mb-3">🗺️ Mapa Conceptual</h4>
-                    <pre className="text-xs text-dark/50 overflow-x-auto p-3 bg-white rounded-xl">
-                      {content.mapa_mermaid}
-                    </pre>
-                  </div>
-                )}
+                {/* Mapa conceptual eliminado — se integrará con Mermaid en el merge */}
               </div>
             </div>
           </motion.div>
@@ -110,7 +116,7 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
 
         {/* 📄 MODO DISLEXIA */}
         {mode === 'DYSLEXIA' && (
-          <motion.div 
+          <motion.div
             key="dyslexia"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -122,20 +128,19 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
               <FileText className="text-mint" />
               Lectura Adaptada
             </h3>
-            
+
             <div className="max-w-3xl space-y-6">
               {content.resumen && (
                 <div className="bg-mint/10 p-5 rounded-2xl">
                   <p className="font-dyslexic text-xl leading-loose tracking-wide text-dark">
-                    {formatBoldText(content.resumen)}
+                    {formatBoldText(limpiarBloque(content.resumen, true))}
                   </p>
                 </div>
               )}
-
               <div className="space-y-6 mt-6">
                 {content.bloques?.map((bloque: string, index: number) => (
                   <p key={index} className="font-dyslexic text-xl leading-loose tracking-wide text-dark/90">
-                    {formatBoldText(bloque)}
+                    {formatBoldText(limpiarBloque(bloque, true))}
                   </p>
                 ))}
               </div>
@@ -143,9 +148,9 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
           </motion.div>
         )}
 
-        {/* ❓ MODO QUIZ (Se queda casi igual, solo validamos la nueva estructura) */}
+        {/* ❓ MODO QUIZ */}
         {mode === 'QUIZ' && (
-          <motion.div 
+          <motion.div
             key="quiz"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -173,6 +178,7 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
             </div>
           </motion.div>
         )}
+
       </AnimatePresence>
     </div>
   );
