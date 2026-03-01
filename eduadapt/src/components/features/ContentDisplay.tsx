@@ -191,7 +191,9 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
   }
 
   const hasContent = content && (content.resumen || content.bloques || content.quiz);
-  const textoDislexia: string = content?.resumen_oral || content?.resumen || '';
+  const resumenInicial = content?.resumen_oral || content?.resumen || '';
+  const bloquesTexto = content?.bloques?.join(' ') || '';
+  const textoCompletoParaLeer = `${resumenInicial} ${bloquesTexto}`.trim();
 
   return (
     <>
@@ -266,24 +268,31 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
             </motion.div>
           )}
 
-          {/* ── DISLEXIA (DYSLEXIA) ────────────────────── */}
+                    {/* ── DISLEXIA (DYSLEXIA) ────────────────────── */}
           {mode === 'DYSLEXIA' && (
-            <motion.div key="dyslexia" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+            <motion.div key="dyslexia" /* ... props ... */>
               <div className="flex items-center justify-between pr-12">
                 <h3 className="text-2xl font-bold text-dark flex items-center gap-2 font-dyslexic">
                   <FileText className="text-mint" /> Lectura Adaptada
                 </h3>
-                {textoDislexia && (
-                  <button onClick={() => toggleSpeech(textoDislexia)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all shrink-0 ${isSpeaking ? 'bg-red-100 text-red-600' : 'bg-mint/10 text-mint hover:bg-mint/20'}`}>
+                
+                {/* CAMBIO AQUÍ: Usar textoCompletoParaLeer */}
+                {textoCompletoParaLeer && (
+                  <button 
+                    onClick={() => toggleSpeech(textoCompletoParaLeer)} 
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all shrink-0 ${isSpeaking ? 'bg-red-100 text-red-600' : 'bg-mint/10 text-mint hover:bg-mint/20'}`}
+                  >
                     {isSpeaking ? <Square size={18} fill="currentColor" /> : <Volume2 size={18} />}
                     <span className="font-medium text-sm">{isSpeaking ? 'Detener' : 'Escuchar'}</span>
                   </button>
                 )}
               </div>
+              
+              {/* El resto de tu renderizado se mantiene igual para mantener el diseño visual separado */}
               <div className="max-w-3xl space-y-6">
                 <div className="bg-mint/10 p-5 rounded-2xl">
                   <p className="font-dyslexic text-xl leading-loose tracking-wide text-dark">
-                    {formatBoldText(textoDislexia, true)}
+                    {formatBoldText(resumenInicial, true)}
                   </p>
                 </div>
                 {content.bloques?.map((bloque: string, i: number) => (
