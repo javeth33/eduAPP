@@ -41,7 +41,7 @@ export default function App() {
         bloques: result.bloques,
         glosario: result.glosario,
         mapa_mermaid: result.mapa_mermaid,
-        quiz: result.quiz,
+        //quiz: result.quiz,
         originalText: result.resumen,
         adhd: {
           keyPoints: result.bloques,
