@@ -81,7 +81,7 @@ export default function App() {
               Si ya terminó, ContentDisplay hace su magia */}
           {content.isProcessing ? (
             <div className="text-center p-10 bg-white rounded-3xl shadow-sm border border-sky/20">
-              <p className="text-xl font-bold text-sky animate-pulse">🧠 Analizando y adaptando material...</p>
+              <p className="text-xl font-bold text-sky animate-pulse"> Analizando y adaptando material...</p>
             </div>
           ) : (
             <ContentDisplay mode={activeMode} content={content} />

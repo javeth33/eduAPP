@@ -212,7 +212,7 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
             <motion.div key="adhd" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
               <h3 className="text-2xl font-bold text-dark flex items-center gap-2"><Brain className="text-sky" /> Resumen Visual</h3>
               
-              <div className="grid gap-6 md:grid-cols-2 md:items-stretch">
+              <div className="grid gap-6 md:grid-cols-2 md:items-start">
                 <div className="space-y-4">
                   {content.resumen && (
                     <div className="text-lg font-semibold text-dark/90 pb-3 border-b border-dark/10">
@@ -227,7 +227,7 @@ export function ContentDisplay({ mode, content }: ContentDisplayProps) {
                 </div>
 
                 {content.mapa_mermaid ? (
-                  <button onClick={() => setMapOpen(true)} className="w-full h-full group bg-gradient-to-br from-purple-50 to-sky-50 border-2 border-purple-100 hover:border-purple-300 rounded-2xl p-5 text-left transition-all duration-200 hover:shadow-md flex flex-col">
+                  <button onClick={() => setMapOpen(true)} className="w-full group bg-gradient-to-br from-purple-50 to-sky-50 border-2 border-purple-100 hover:border-purple-300 rounded-2xl p-5 text-left transition-all duration-200 hover:shadow-md flex flex-col">
                     <div className="flex items-center justify-between mb-3 shrink-0">
                       <span className="flex items-center gap-2 text-sm font-semibold text-purple-600">
                         <GitBranch size={16} /> Mapa Conceptual
